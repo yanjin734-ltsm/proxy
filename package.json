@@ -1,0 +1,33 @@
+{
+  "name": "perplexity-opencode-proxy",
+  "version": "1.0.0",
+  "description": "OpenAI-compatible proxy for Perplexity desktop app - extract session cookies and proxy requests to Perplexity's internal API",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "test": "node dist/test.js"
+  },
+  "keywords": [
+    "perplexity",
+    "opencode",
+    "proxy",
+    "openai-compatible",
+    "reverse-engineering"
+  ],
+  "author": "yanjin734",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.10",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
