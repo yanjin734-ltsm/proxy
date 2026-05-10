@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { join } from "path";
 import { homedir } from "os";
 import { existsSync } from "fs";
+import { execSync } from "child_process";
 
 export interface PerplexityAuth {
   sessionToken: string;
@@ -23,6 +24,7 @@ export class AuthExtractor {
         "AppData",
         "Roaming",
         "Perplexity",
+        "Network",
         "Cookies"
       );
     }
@@ -37,6 +39,7 @@ export class AuthExtractor {
 
   /**
    * Extract session token from Perplexity cookie database
+   * Uses multiple methods to read locked database
    */
   extractAuth(): PerplexityAuth | null {
     if (!this.isAvailable()) {
@@ -44,9 +47,74 @@ export class AuthExtractor {
       return null;
     }
 
-    try {
-      const db = new Database(this.cookieDbPath, { readonly: true });
+    // Try multiple methods to read the database
+    let db: Database.Database | null = null;
 
+    // Method 1: Try direct read with shared lock
+    try {
+      db = new Database(this.cookieDbPath, { 
+        readonly: true,
+        fileMustExist: false
+      });
+    } catch (error) {
+      console.log("Direct read failed, trying alternative methods...");
+    }
+
+    // Method 2: Try to copy file using Windows backup semantics
+    if (!db) {
+      try {
+        const tempPath = join(homedir(), "AppData", "Local", "Temp", "perplexity_cookies_temp");
+        
+        // Use Windows backup semantics to copy locked file
+        execSync(`cmd /c "type \"${this.cookieDbPath}\" > \"${tempPath}\" 2>nul"`, { 
+          windowsHide: true,
+          timeout: 5000
+        });
+        
+        if (existsSync(tempPath)) {
+          db = new Database(tempPath, { readonly: true });
+        }
+      } catch (error) {
+        console.log("Backup copy failed, trying VSS...");
+      }
+    }
+
+    // Method 3: Use Volume Shadow Copy (VSS)
+    if (!db) {
+      try {
+        // Create shadow copy
+        execSync("vssadmin create shadow /for=C:", { 
+          windowsHide: true,
+          timeout: 30000
+        });
+        
+        // Get shadow copy path
+        const shadowOutput = execSync("vssadmin list shadows /for=C:", { 
+          windowsHide: true,
+          encoding: "utf-8"
+        });
+        
+        // Parse shadow copy path from output
+        const shadowMatch = shadowOutput.match(/Shadow Copy Volume: (\\\?\?GLOBALROOT\Device\HarddiskVolumeShadowCopy\d+)/);
+        if (shadowMatch) {
+          const shadowPath = shadowMatch[1];
+          const cookieShadowPath = join(shadowPath, "Users", process.env.USERNAME || "test", "AppData", "Roaming", "Perplexity", "Network", "Cookies");
+          
+          if (existsSync(cookieShadowPath)) {
+            db = new Database(cookieShadowPath, { readonly: true });
+          }
+        }
+      } catch (error) {
+        console.error("VSS method failed:", error);
+      }
+    }
+
+    if (!db) {
+      console.error("Failed to read Perplexity cookie database. Make sure Perplexity is running and you are logged in.");
+      return null;
+    }
+
+    try {
       // Query for session token
       const sessionToken = this.queryCookie(db, "__Secure-next-auth.session-token");
       const csrfToken = this.queryCookie(db, "next-auth.csrf-token");
@@ -66,6 +134,7 @@ export class AuthExtractor {
       };
     } catch (error) {
       console.error("Failed to extract auth from Perplexity:", error);
+      if (db) db.close();
       return null;
     }
   }
