@@ -1,4 +1,6 @@
-﻿import { PerplexityAuth } from "./types.js";
+import { PerplexityAuth } from "./types.js";
+
+export { PerplexityAuth };
 
 /**
  * Authentication extractor for Perplexity
@@ -9,6 +11,12 @@
  * 3. Anonymous mode (no authentication, limited queries)
  */
 export class AuthExtractor {
+  private customPath?: string;
+
+  constructor(customPath?: string) {
+    this.customPath = customPath;
+  }
+
   /**
    * Extract authentication from environment or return null for anonymous
    */
@@ -33,6 +41,6 @@ export class AuthExtractor {
   }
 }
 
-export function createAuthExtractor(): AuthExtractor {
-  return new AuthExtractor();
+export function createAuthExtractor(customPath?: string): AuthExtractor {
+  return new AuthExtractor(customPath);
 }

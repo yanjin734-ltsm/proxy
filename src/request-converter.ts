@@ -1,4 +1,4 @@
-import { PerplexityAuth } from "./auth-extractor.js";
+import { PerplexityAuth } from "./types.js";
 
 export interface OpenAIMessage {
   role: "system" | "user" | "assistant" | "tool";
